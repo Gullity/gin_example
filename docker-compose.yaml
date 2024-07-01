@@ -1,0 +1,49 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.103.1
+    command: ["--config=/etc/otel-collector.yaml"]
+    environment:
+      - DD_API_KEY=Your_Datadog_Site
+      - DD_SITE=Your_Datadog_Site
+    volumes:
+      - ./build/collector/otel-collector.yaml:/etc/otel-collector.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+
+  datadog:
+    container_name: dd-agent
+    image: gcr.io/datadoghq/agent:7
+    environment:
+      # Default configuration
+      - DD_API_KEY=Your_Datadog_API_KEY
+      # DD_SITE Example: us5.datadoghq.com
+      - DD_SITE=Your_Datadog_Site
+      # Option to the container's parameters to listen to dogstatsd packets from other container
+      - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
+      # OpenTelemetry Endpoints
+      - DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT=0.0.0.0:4317
+      # Option to accept logs
+      - DD_LOGS_ENABLED=true
+      # Option that enables OpenTelemetry Logs
+      - DD_OTLP_CONFIG_LOGS_ENABLED=true
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http:Your_Datadog_Site:4318
+    ports:
+      - "8126:8126/tcp"
+      - "8125:8125/udp"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+
+  api:
+    build:
+      dockerfile: ./build/Dockerfile
+    ports:
+      - "8080:8080"
+    links:
+      - otel-collector:collector
+    depends_on:
+      - otel-collector
+      - datadog
